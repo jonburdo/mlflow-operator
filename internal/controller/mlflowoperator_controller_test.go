@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,8 +23,92 @@ import (
 func newMLflowOperatorReconciler(cli client.Client, scheme *runtime.Scheme, applicationsNamespace string) *MLflowOperatorReconciler {
 	return &MLflowOperatorReconciler{
 		Client:                cli,
+		APIReader:             cli,
 		Scheme:                scheme,
 		ApplicationsNamespace: applicationsNamespace,
+	}
+}
+
+func TestMLflowOperatorReconcileManagesMetricsServiceMonitor(t *testing.T) {
+	scheme := runtime.NewScheme()
+	for _, addToScheme := range []func(*runtime.Scheme) error{
+		modulev1alpha1.AddToScheme,
+		mlflowv1.AddToScheme,
+		monitoringv1.AddToScheme,
+		corev1.AddToScheme,
+	} {
+		if err := addToScheme(scheme); err != nil {
+			t.Fatalf("add type to scheme: %v", err)
+		}
+	}
+
+	module := &modulev1alpha1.MLflowOperator{ObjectMeta: metav1.ObjectMeta{
+		Name:       modulev1alpha1.MLflowOperatorInstanceName,
+		Generation: 1,
+	}, Spec: modulev1alpha1.MLflowOperatorSpec{MLflowOperatorCommonSpec: modulev1alpha1.MLflowOperatorCommonSpec{
+		GatewayName: "data-science-gateway", SectionTitle: "OpenShift AI",
+	}}}
+	legacy := &monitoringv1.ServiceMonitor{ObjectMeta: metav1.ObjectMeta{
+		Name: legacyMetricsMonitorName, Namespace: "redhat-ods-applications",
+	}, Spec: monitoringv1.ServiceMonitorSpec{Selector: metav1.LabelSelector{MatchLabels: map[string]string{
+		"app.kubernetes.io/name": "mlflow-operator", "control-plane": "controller-manager",
+	}}}}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(&modulev1alpha1.MLflowOperator{}).
+		WithObjects(module, legacy).Build()
+	reconciler := newMLflowOperatorReconciler(fakeClient, scheme, "redhat-ods-applications")
+	reconciler.ServiceMonitorAvailable = true
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: modulev1alpha1.MLflowOperatorInstanceName}}
+
+	if _, err := reconciler.Reconcile(context.Background(), req); err != nil {
+		t.Fatalf("add finalizer: %v", err)
+	}
+	if _, err := reconciler.Reconcile(context.Background(), req); err != nil {
+		t.Fatalf("reconcile metrics monitor: %v", err)
+	}
+
+	monitor := &monitoringv1.ServiceMonitor{}
+	if err := fakeClient.Get(context.Background(), types.NamespacedName{
+		Name: operatorMetricsMonitorName, Namespace: "redhat-ods-applications",
+	}, monitor); err != nil {
+		t.Fatalf("get metrics ServiceMonitor: %v", err)
+	}
+	if len(monitor.OwnerReferences) != 1 || monitor.OwnerReferences[0].Name != module.Name || !*monitor.OwnerReferences[0].Controller {
+		t.Fatalf("expected module controller owner reference, got %#v", monitor.OwnerReferences)
+	}
+	if monitor.Labels["app"] != "mlflow" {
+		t.Fatalf("expected ServiceMonitor to match the operator cache selector, got labels %#v", monitor.Labels)
+	}
+	endpoint := monitor.Spec.Endpoints[0]
+	if endpoint.Path != "/metrics" || endpoint.Port != metricsPortName || endpoint.Scheme == nil || *endpoint.Scheme != monitoringv1.SchemeHTTPS {
+		t.Fatalf("unexpected endpoint: %#v", endpoint)
+	}
+	if endpoint.TLSConfig == nil || endpoint.TLSConfig.ServerName == nil || *endpoint.TLSConfig.ServerName != "mlflow-operator-controller-manager-metrics-service.redhat-ods-applications.svc" {
+		t.Fatalf("unexpected TLS config: %#v", endpoint.TLSConfig)
+	}
+	if err := fakeClient.Get(context.Background(), types.NamespacedName{Name: legacyMetricsMonitorName, Namespace: "redhat-ods-applications"}, &monitoringv1.ServiceMonitor{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("expected legacy ServiceMonitor to be deleted, got %v", err)
+	}
+}
+
+func TestDeleteLegacyMetricsServiceMonitorIgnoresForeignMonitor(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := monitoringv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add ServiceMonitor to scheme: %v", err)
+	}
+	foreign := &monitoringv1.ServiceMonitor{ObjectMeta: metav1.ObjectMeta{
+		Name: legacyMetricsMonitorName, Namespace: "redhat-ods-applications",
+	}, Spec: monitoringv1.ServiceMonitorSpec{Selector: metav1.LabelSelector{MatchLabels: map[string]string{
+		"app.kubernetes.io/name": "another-operator", "control-plane": "controller-manager",
+	}}}}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(foreign).Build()
+	reconciler := newMLflowOperatorReconciler(fakeClient, scheme, "redhat-ods-applications")
+
+	if err := reconciler.deleteLegacyMetricsServiceMonitor(context.Background()); err != nil {
+		t.Fatalf("delete legacy metrics monitor: %v", err)
+	}
+	if err := fakeClient.Get(context.Background(), types.NamespacedName{Name: legacyMetricsMonitorName, Namespace: "redhat-ods-applications"}, &monitoringv1.ServiceMonitor{}); err != nil {
+		t.Fatalf("expected foreign ServiceMonitor to remain: %v", err)
 	}
 }
 
