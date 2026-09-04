@@ -4,7 +4,7 @@ name: MLflow Runtime Integration Tests
 # The scheduled ODH default-image alignment check lives in verify-mlflow-version-alignment.yml.
 #
 # Sync note: the base integration-test matrix lives in mlflow-tests/ci/integration-matrix.json
-# and is also consumed by opendatahub-io/mlflow .github/workflows/operator-integration-tests.yml.
+# and is also consumed by jonburdo/mlflow .github/workflows/operator-integration-tests.yml.
 # This workflow adds operator-PR-only file and S3 artifact-server rows until the companion workflow
 # forwards that mode. Keep the remaining env vars, action versions, and script calls in sync.
 
@@ -30,7 +30,7 @@ on:
   workflow_call:
     inputs:
       mlflow_repository:
-        description: "Repository to build MLflow image from (e.g., opendatahub-io/mlflow)"
+        description: "Repository to build MLflow image from (e.g., jonburdo/mlflow)"
         type: string
         required: false
         default: ""
@@ -120,10 +120,10 @@ jobs:
             if [[ "$REPOSITORY_OWNER" == "red-hat-data-services" ]]; then
               SOURCE_REPOSITORY="red-hat-data-services/mlflow"
             else
-              SOURCE_REPOSITORY="opendatahub-io/mlflow"
+              SOURCE_REPOSITORY="jonburdo/mlflow"
             fi
 
-            if [[ "$REPOSITORY_OWNER" == "opendatahub-io" && "$TARGET_REF" == "main" ]]; then
+            if [[ "$REPOSITORY_OWNER" == "jonburdo" && "$TARGET_REF" == "main" ]]; then
               SOURCE_REF="master"
             else
               SOURCE_REF="$TARGET_REF"
@@ -426,7 +426,7 @@ jobs:
             --mlflow-image "$MLFLOW_RUNTIME_IMAGE"
 
   verify-default-mlflow-version-alignment:
-    if: "!inputs.mlflow_repository && github.event_name != 'workflow_dispatch' && github.repository_owner == 'opendatahub-io' && (github.ref_name == 'main' || github.base_ref == 'main')"
+    if: "!inputs.mlflow_repository && github.event_name != 'workflow_dispatch' && github.repository_owner == 'jonburdo' && (github.ref_name == 'main' || github.base_ref == 'main')"
     permissions:
       contents: read
     runs-on: ubuntu-latest
