@@ -18,6 +18,10 @@ on:
 env:
   IMG: "localhost/mlflow-operator:v0.0.1"
   CLUSTER_NAME: "mlflow"
+  IS_RHDS_REPOSITORY: ${{ github.repository_owner == 'jonburdo' }}
+  IS_CROSS_REPOSITORY_PR: >-
+    ${{ github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name != github.repository }}
 
 jobs:
   test-e2e:
@@ -31,6 +35,26 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Require cached operator base image
+        id: base-image
+        # Base-image access:
+        # - RHDS cross-repository PRs: restore the trusted cache.
+        # - Other RHDS runs: log in and pull directly.
+        # - Non-RHDS repositories: neither step; base images must be public.
+        if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR == 'true'
+        uses: ./.github/actions/restore-base-image
+        with:
+          dockerfile: Dockerfile
+          cache-path: .operator-base-image-cache
+
+      - name: Log in to Red Hat registry
+        if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR != 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: registry.redhat.io
+          username: ${{ secrets.RH_REGISTRY_USERNAME }}
+          password: ${{ secrets.RH_REGISTRY_PASSWORD }}
+
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
@@ -43,7 +67,9 @@ jobs:
           k8s_version: "v1.34.0"
 
       - name: Build operator image
-        run: make docker-build IMG=${{ env.IMG }}
+        env:
+          BASE_IMAGE: ${{ steps.base-image.outputs.local-tag }}
+        run: make docker-build IMG=${{ env.IMG }} BASE_IMAGE="$BASE_IMAGE"
 
       - name: Load image into Kind cluster
         run: kind load docker-image ${{ env.IMG }} --name ${{ env.CLUSTER_NAME }}

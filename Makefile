@@ -160,7 +160,10 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --build-arg SUPPORTED_MLFLOW_VERSION_OVERRIDE="$(SUPPORTED_MLFLOW_VERSION_OVERRIDE)" -t ${IMG} -f Dockerfile.konflux .
+	$(CONTAINER_TOOL) build \
+		--build-arg SUPPORTED_MLFLOW_VERSION_OVERRIDE="$(SUPPORTED_MLFLOW_VERSION_OVERRIDE)" \
+		$(if $(BASE_IMAGE),--build-arg BASE_IMAGE="$(BASE_IMAGE)") \
+		-t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
