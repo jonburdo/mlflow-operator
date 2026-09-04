@@ -27,6 +27,13 @@
 #   PYTEST_ARGS                 extra pytest flags
 #   PYTEST_MARK_EXPRESSION      optional pytest -m expression
 #   TEST_RESULTS_DIR            host path for JUnit XML output (default: test-results)
+#   SKIP_DEPLOYMENT             forward deployment reuse behavior to test-run.sh
+#   SKIP_OPERATOR               forward operator reuse behavior to test-run.sh
+#   SKIP_CLEANUP                forward cleanup behavior to test-run.sh
+#   CLEANUP_REUSED_RESOURCES    forward reused-resource cleanup behavior to test-run.sh
+#   MLFLOW_TEST_SUPPORTED_VERSION
+#                               override the version used to select upgrade datasets
+#   upgrade_test_workspace      namespace used by upgrade pre/post phases
 
 set -euo pipefail
 
@@ -56,6 +63,18 @@ if [[ ",${ARTIFACT_BACKENDS}," == *,s3,* ]]; then
     --add-host "minio-service.${NAMESPACE}.svc.cluster.local:127.0.0.1"
   )
 fi
+
+for name in \
+  SKIP_DEPLOYMENT \
+  SKIP_OPERATOR \
+  SKIP_CLEANUP \
+  CLEANUP_REUSED_RESOURCES \
+  MLFLOW_TEST_SUPPORTED_VERSION \
+  upgrade_test_workspace; do
+  if [[ -v "$name" ]]; then
+    docker_args+=(-e "$name=${!name}")
+  fi
+done
 
 set +e
 docker run "${docker_args[@]}" \
