@@ -19,9 +19,7 @@ env:
   IMG: "localhost/mlflow-operator:v0.0.1"
   CLUSTER_NAME: "mlflow"
   IS_RHDS_REPOSITORY: ${{ github.repository_owner == 'jonburdo' }}
-  IS_CROSS_REPOSITORY_PR: >-
-    ${{ github.event_name == 'pull_request' &&
-        github.event.pull_request.head.repo.full_name != github.repository }}
+  IS_CROSS_REPOSITORY_PR: true
 
 jobs:
   test-e2e:
