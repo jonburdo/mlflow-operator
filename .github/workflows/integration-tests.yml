@@ -153,7 +153,7 @@ jobs:
       - name: Resolve public base image
         id: public-base-image
         if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR == 'true'
-        uses: ./.github/actions/resolve-base-image
+        uses: opendatahub-io/mlflow/.github/actions/resolve-base-image@d3ee93af81de247bfd75547c1cae4c365b0ad278 # master
         with:
           repository: jonburdo/mlflow
           ref: image-auth-odh
@@ -217,7 +217,7 @@ jobs:
       - name: Resolve public base image
         id: public-base-image
         if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR == 'true'
-        uses: ./.github/actions/resolve-base-image
+        uses: opendatahub-io/mlflow/.github/actions/resolve-base-image@d3ee93af81de247bfd75547c1cae4c365b0ad278 # master
         with:
           repository: jonburdo/mlflow-operator
           ref: image-auth-odh
