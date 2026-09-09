@@ -59,7 +59,7 @@ jobs:
 
           # Prefix tags to avoid collisions with Konflux builds.
           # Konflux pushes {{target_branch}} directly (e.g. main, rhoai-3.4).
-          if [[ "$REPO" == red-hat-data-services/* ]]; then
+          if [[ "$REPO" == jonburdo/* ]]; then
             # rhoai-* branches are already namespaced
             if [[ ! "$TAG_NAME" =~ ^rhoai- ]]; then
               TAG_NAME="rhds-${TAG_NAME}"

@@ -18,7 +18,7 @@ on:
 env:
   IMG: "localhost/mlflow-operator:v0.0.1"
   CLUSTER_NAME: "mlflow"
-  IS_RHDS_REPOSITORY: ${{ github.repository_owner == 'red-hat-data-services' }}
+  IS_RHDS_REPOSITORY: ${{ github.repository_owner == 'jonburdo' }}
   IS_CROSS_REPOSITORY_PR: >-
     ${{ github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name != github.repository }}
@@ -42,8 +42,8 @@ jobs:
         if: env.IS_RHDS_REPOSITORY == 'true' && env.IS_CROSS_REPOSITORY_PR == 'true'
         uses: ./.github/actions/resolve-base-image
         with:
-          repository: opendatahub-io/mlflow-operator
-          ref: main
+          repository: jonburdo/mlflow-operator
+          ref: image-auth-odh
           dockerfile: Dockerfile
           token: ${{ secrets.GITHUB_TOKEN }}
 
